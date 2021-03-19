@@ -2,19 +2,20 @@ import os
 import logging
 import numpy as np
 import multiprocessing as mp
-os.environ['CUDA_VISIBLE_DEVICES']=''
+os.environ['CUDA_VISIBLE_DEVICES']='-1'
 import tensorflow as tf
 import env
 import a3c
 
 
-S_INFO = 8  # bit_rate, buffer_size, bandwidth_measurement, measurement_time, chunk_til_video_end
+S_INFO = 11  # bit_rate, buffer_size, bandwidth_measurement, measurement_time, chunk_til_video_end
 S_LEN = 10  # take how many frames in the past
 A_DIM = 10
 ACTOR_LR_RATE = 0.0001
 CRITIC_LR_RATE = 0.0001
 NUM_AGENTS = 16
 TRAIN_SEQ_LEN = 200  # take as a train batch
+# TRAIN_SEQ_LEN = 16
 MODEL_SAVE_INTERVAL = 100
 VIDEO_BIT_RATE = [200,300,450,750,1200,1850,2850,4300,6000,8000]  # Kbps
 BUFFER_NORM_FACTOR = 10.0
@@ -30,8 +31,8 @@ SUMMARY_DIR = './results'
 LOG_FILE = './results/log'
 TEST_LOG_FOLDER = './test_results/'
 TRAIN_TRACES = './cooked_traces/'
-# NN_MODEL = os.environ['last_model']
-NN_MODEL = None
+NN_MODEL = os.environ['last_model']
+# NN_MODEL = None
 
 
 # for multi-video setting,
@@ -127,7 +128,7 @@ def central_agent(net_params_queues, exp_queues):
 
         # restore neural net parameters
         nn_model = NN_MODEL
-        if nn_model == None:
+        if nn_model == 'None':
             epoch = 0
             nn_model = None
         if nn_model is not None:  # nn_model is the path to file
@@ -158,7 +159,7 @@ def central_agent(net_params_queues, exp_queues):
 
             for i in xrange(NUM_AGENTS):
                 s_batch, a_batch, r_batch, terminal, info = exp_queues[i].get()
-
+                # with tf.device('/gpu:1'):
                 actor_gradient, critic_gradient, td_batch = \
                     a3c.compute_gradients(
                         s_batch=np.stack(s_batch, axis=0),
@@ -266,7 +267,7 @@ def agent(agent_id, net_params_queue, exp_queue):
             delay, sleep_time, buffer_size, \
                 rebuf, video_chunk_size, end_of_video, \
                 video_chunk_remain, video_num_chunks, \
-                next_video_chunk_size, mask = \
+                next_video_chunk_size, mask, cwnd, in_flight, rtt, min_rtt = \
                 net_env.get_video_chunk(bit_rate)
 
             time_stamp += delay  # in ms
@@ -305,9 +306,13 @@ def agent(agent_id, net_params_queue, exp_queue):
                     nxt_chnk_cnt += 1
             assert(nxt_chnk_cnt) == np.sum(mask)
             state[6, -A_DIM:] = mask
-            state[7,-1] = 10
+            state[7,-1] = cwnd
+            state[8,-1] = in_flight
+            state[9,-1] = rtt
+            state[10,-1] = min_rtt
 
             # compute action probability vector
+            # with tf.device('/cpu:0'):
             action_prob = actor.predict(np.reshape(state, (1, S_INFO, S_LEN)))
 
             # the action probability should correspond to number of bit rates
@@ -375,6 +380,7 @@ def agent(agent_id, net_params_queue, exp_queue):
 
 def main():
 
+    tf.ConfigProto(log_device_placement=True)
     np.random.seed(RANDOM_SEED)
     assert len(VIDEO_BIT_RATE) == A_DIM
 

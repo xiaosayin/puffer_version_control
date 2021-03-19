@@ -35,19 +35,35 @@ class Environment:
 		cooked_files = os.listdir(self.trace_folder)
 		self.all_cooked_time = []
 		self.all_cooked_bw = []
+		self.all_cooked_cwnd = []
+		self.all_cooked_in_flight = []
+		self.all_cooked_rtt = []
+		self.all_cooked_min_rtt = []
 		self.all_file_names = []
 		for cooked_file in cooked_files:
 			file_path = self.trace_folder + cooked_file
 			cooked_time = []
 			cooked_bw = []
+			cooked_cwnd = []
+			cooked_in_flight = []
+			cooked_rtt = []
+			cooked_min_rtt = []
 			# print file_path
 			with open(file_path, 'rb') as f:
 				for line in f:
 					parse = line.split()
 					cooked_time.append(float(parse[0]))
 					cooked_bw.append(float(parse[1]))
+					cooked_cwnd.append(float(parse[2]))
+					cooked_in_flight.append(float(parse[3]))
+					cooked_rtt.append(float(parse[4]))
+					cooked_min_rtt.append(float(parse[5]))
 			self.all_cooked_time.append(cooked_time)
 			self.all_cooked_bw.append(cooked_bw)
+			self.all_cooked_cwnd.append(cooked_cwnd)
+			self.all_cooked_in_flight.append(cooked_in_flight)
+			self.all_cooked_rtt.append(cooked_rtt)
+			self.all_cooked_min_rtt.append(cooked_min_rtt)
 			self.all_file_names.append(cooked_file)
 
 		if self.fixed_env:
@@ -57,6 +73,10 @@ class Environment:
 			
 		self.cooked_time = self.all_cooked_time[self.trace_idx]
 		self.cooked_bw = self.all_cooked_bw[self.trace_idx]
+		self.cooked_cwnd = self.all_cooked_cwnd[self.trace_idx]
+		self.cooked_in_flight = self.all_cooked_in_flight[self.trace_idx]
+		self.cooked_rtt = self.all_cooked_rtt[self.trace_idx]
+		self.cooked_min_rtt = self.all_cooked_min_rtt[self.trace_idx]
 
 		if self.fixed_env:
 			self.mahimahi_ptr = 1
@@ -210,6 +230,17 @@ class Environment:
 
 		self.chunk_idx += 1
 
+		if self.mahimahi_ptr >= len(self.cooked_cwnd):
+			print("mahimahi_ptr",self.mahimahi_ptr)
+			self.mahimahi_ptr = -1
+			print("len_cwnd",len(self.cooked_cwnd))
+			print("len_cooked_bw",len(self.cooked_bw))
+
+		cwnd = self.cooked_cwnd[self.mahimahi_ptr]
+		in_flight = self.cooked_in_flight[self.mahimahi_ptr]
+		rtt = self.cooked_rtt[self.mahimahi_ptr]
+		min_rtt = self.cooked_min_rtt[self.mahimahi_ptr]
+
 		end_of_video = False
 		if self.chunk_idx >= self.video_num_chunks[self.video_idx]:
 			end_of_video = True
@@ -227,6 +258,10 @@ class Environment:
 
 			self.cooked_time = self.all_cooked_time[self.trace_idx]
 			self.cooked_bw = self.all_cooked_bw[self.trace_idx]
+			self.cooked_cwnd = self.all_cooked_cwnd[self.trace_idx]
+			self.cooked_in_flight = self.all_cooked_in_flight[self.trace_idx]
+			self.cooked_rtt = self.all_cooked_rtt[self.trace_idx]
+			self.cooked_min_rtt = self.all_cooked_min_rtt[self.trace_idx]
 
 			if self.fixed_env:
 				self.mahimahi_ptr = 1
@@ -242,6 +277,7 @@ class Environment:
 		next_video_chunk_sizes = self.video_sizes[self.video_idx][self.chunk_idx]
 		bitrate_mask = self.video_masks[self.video_idx]
 
+
 		return delay, \
 			sleep_time, \
 			return_buffer_size / MILLISECONDS_IN_SECOND, \
@@ -251,7 +287,8 @@ class Environment:
 			video_chunk_remain, \
 			video_num_chunks, \
 			next_video_chunk_sizes, \
-			bitrate_mask
+			bitrate_mask, \
+	        cwnd, in_flight, rtt, min_rtt
 
 
 def main():

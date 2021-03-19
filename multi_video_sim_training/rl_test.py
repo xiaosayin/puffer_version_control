@@ -7,7 +7,7 @@ import a3c
 import env
 
 
-S_INFO = 8  # bit_rate, buffer_size, bandwidth_measurement, measurement_time, chunk_til_video_end
+S_INFO = 11  # bit_rate, buffer_size, bandwidth_measurement, measurement_time, chunk_til_video_end
 S_LEN = 10  # take how many frames in the past
 A_DIM = 10
 ACTOR_LR_RATE = 0.0001
@@ -99,7 +99,7 @@ def main():
             delay, sleep_time, buffer_size, \
                 rebuf, video_chunk_size, end_of_video, \
                 video_chunk_remain, video_num_chunks, \
-                next_video_chunk_size, mask = \
+                next_video_chunk_size, mask, cwnd, in_flight, rtt, min_rtt = \
                 net_env.get_video_chunk(bit_rate)
 
             time_stamp += delay  # in ms
@@ -146,7 +146,10 @@ def main():
                     nxt_chnk_cnt += 1
             assert(nxt_chnk_cnt) == np.sum(mask)
             state[6, -A_DIM:] = mask
-            state[7,-1] = 100
+            state[7,-1] = cwnd
+            state[8, -1] = in_flight
+            state[9, -1] = rtt
+            state[10, -1] = min_rtt
 
             action_prob = actor.predict(np.reshape(state, (1, S_INFO, S_LEN)))
 
